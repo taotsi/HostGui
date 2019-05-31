@@ -1,6 +1,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 // dont include this file anywhere else.
 // dont include it in a header file;
+#include <algorithm>
 #include <stb/stb_image.h>
 #include "hostgui.h"
 
@@ -43,8 +44,7 @@ void HostGui::ThreadMain(){
 
 	glEnable(GL_DEPTH_TEST);
 
-	Shader shader{"./src/vertex_shader.vs", "./src/fragment_shader.fs"};
-	Shader shader_strip_line{"./src/line_strip.vs", "./src/line_strip.fs"};
+	Shader shader_planes{"./src/planes.vs", "./src/planes.fs"};
 
 	// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
@@ -58,17 +58,17 @@ void HostGui::ThreadMain(){
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
-    unsigned char *data = stbi_load("./resources/container.jpg", &width, &height, &nrChannels, 0);
-    if (data){
+    // NOTE: I failed to load .png that I made using photoshop 2019, .jpg works though
+    unsigned char *data = stbi_load("./resources/yb256.jpg", &width, &height, &nrChannels, 0);
+    if(data){
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
     }else{
         std::cout << "Failed to load texture" << std::endl;
     }
     stbi_image_free(data);
-
-    shader.use();
-    shader.setInt("texture1", 0);
+    shader_planes.use();
+    shader_planes.setInt("texture1", 0);
 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -113,9 +113,24 @@ void HostGui::ThreadMain(){
         projection = glm::perspective(glm::radians(60.0f), (float)SCR_WIDTH_ / (float)SCR_HEIGHT_, 0.1f, 100.0f);
 
 		/* Render OpenGL primitives here */
+		if(show_planes_){
+			RenderPlanes(shader_planes, model, view, projection);
+		}
+		if(show_point_cloud_){
+			RenderPointCloud();
+		}
+		if(show_path_togo_){
+			RenderPathToGo();
+		}
+		if(show_path_been_){
+			RenderPathBeen();
+		}
+		if(show_image_window_){
+			RenderImageWindow();
+		}
 
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-		glViewport(0, 0, 500, 600);
+		// glViewport(0, 0, 500, 600);
 
 		// glfwMakeContextCurrent(window);
 		glfwSwapBuffers(window);
@@ -138,49 +153,163 @@ void HostGui::ThreadMain(){
     is_on_ = false;
 }
 
-void HostGui::RenderPoints(std::vector<float> data, Shader &shader, glm::mat4 &model, glm::mat4 &view, glm::mat4 &projection){
-	shader.use();
-	shader.setMat4("model", model);
-	shader.setMat4("view", view);
-	shader.setMat4("projection", projection);
-	auto size = data.size();
+void HostGui::MainPanel(){
+	if(!ImGui::Begin("Panel")){
+        ImGui::End();
+        return;
+    }
 
-	unsigned int vao_stripline, vbo_stripline;
-	glGenVertexArrays(1, &vao_stripline);
-	glGenBuffers(1, &vbo_stripline);
-	glBindVertexArray(vao_stripline);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_stripline);
-	glBufferData(GL_ARRAY_BUFFER, size*sizeof(float), data.data(), GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
+	/* add primitives */
+	static float x1 = 0, y1 = 0, z1 = 0, x2 = 1, y2 = 1, z2 = 1;
+	ImGui::PushItemWidth(100);
+	ImGui::InputFloat("x1", &x1, 0.5, 2, "%.1f"); ImGui::SameLine();
+	ImGui::InputFloat("y1", &y1, 0.5, 2, "%.1f"); ImGui::SameLine();
+	ImGui::InputFloat("z1", &z1, 0.5, 2, "%.1f");
+	ImGui::InputFloat("x2", &x2, 0.5, 2, "%.1f"); ImGui::SameLine();
+	ImGui::InputFloat("y2", &y2, 0.5, 2, "%.1f"); ImGui::SameLine();
+	ImGui::InputFloat("z2", &z2, 0.5, 2, "%.1f");
+	ImGui::PopItemWidth();
+	if(ImGui::Button("Add Plane")){
+		AddPlane(x1, y1, z1, x2, y2, z2);
+	}
+    /* parameter control */
+    ImGui::Separator();
+    ImGui::PushItemWidth(180);
+    static float pre_map_range = map_range_;
+	static float crt_map_range = map_range_;
+    pre_map_range = crt_map_range;
+    if((ImGui::InputFloat("Map Range(m)", &crt_map_range, 1.0, 2.0, "%.0f"))){
+		std::lock_guard<std::mutex> guard{mtx_};
+		if(crt_map_range == 0.f){
+			crt_map_range = pre_map_range;
+		}
+		map_range_ = crt_map_range;
+        auto scale = [coe = pre_map_range/map_range_](auto &ele){return coe*ele;};
+		std::transform(planes_.begin(), planes_.end(), planes_.begin(), scale);
+        std::transform(path_togo_.begin(), path_togo_.end(), path_togo_.begin(), scale);
+		std::transform(path_been_.begin(), path_been_.end(), path_been_.begin(), scale);
+        std::transform(point_cloud_.begin(), point_cloud_.end(), point_cloud_.begin(), scale);
+    }
+    ImGui::PopItemWidth();
 
-	glPointSize(2);
+    /* render option */
+    ImGui::Separator();
+    ImGui::Text("Render Option");
+    ImGui::Checkbox("Compact Model", &show_planes_);
+    // ImGui::Text("%d rectangles", GetCompactModelData().size());
+    ImGui::Checkbox("Point Cloud", &show_point_cloud_);
+    // ImGui::Text("%d points", point_cloud_gl_.size()/3);
+    ImGui::Checkbox("Flight Path To Go", &show_path_togo_);
+	ImGui::Checkbox("Flight Path Been", &show_path_been_);
 
-	glBindVertexArray(vao_stripline);
-	glDrawArrays(GL_POINTS, 0, size/3);
-	glDeleteVertexArrays(1, &vao_stripline);
-	glDeleteBuffers(1, &vbo_stripline);
+    ImGui::Separator();
+    static bool show_demo_window = false;
+    ImGui::Checkbox("Imgui Demo Window", &show_demo_window);
+    if(show_demo_window){
+        ImGui::ShowDemoWindow(&show_demo_window);
+    }
+    // NOTE: this is NOT the fps of the main application
+    ImGui::Text("%.1f ms/frame (%.0f FPS)", 1000.0f/ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    ImGui::End();
 }
 
-void HostGui::MainPanel(){
-	ImGui::Begin("Hello, world!");
+void HostGui::RenderPlanes(Shader &shader, glm::mat4 &model, glm::mat4 &view, glm::mat4 &projection){
+	shader.use();
+    shader.setMat4("model", model);
+    shader.setMat4("view", view);
+    shader.setMat4("projection", projection);
 
-	static bool show_demo_window = false;
-	ImGui::Checkbox("Demo Window", &show_demo_window);
+	auto n_plane = planes_.size();
+    /* draw model data */
+    for(auto i=0; i<n_plane; i+=6){
+		auto x1 = planes_[i+0];
+		auto y1 = planes_[i+1];
+		auto z1 = planes_[i+2];
+		auto x2 = planes_[i+3];
+		auto y2 = planes_[i+4];
+		auto z2 = planes_[i+5];
+        /*
+            a rectangle is composed of two triangles
+            p3-----*p2*
+            | \     |
+            |   \   |
+            |     \ |
+           *p1*-----p4
+        */
+        float texture_width = sqrt(pow(x1-x2, 2) + pow(y1-y2, 2)) * map_range_ / 2.f;
+        float texture_height = abs(z1-z2) * map_range_ / 2.f;
+        float rectangle_gl[] = {
+            x1, z1, -y1, 0.f, 			0.f,               // p1
+            x1, z2, -y1, 0.f, 			texture_height,    // p3
+        	x2, z1, -y2, texture_width, 0.f,               // p4,
+        	x2, z2, -y2, texture_width, texture_height,    // p2
+            x1, z2, -y1, 0.f, 			texture_height,    // p3
+           	x2, z1, -y2, texture_width, 0.f                // p4
+        };
 
-	static float f = 0.0f;
-	ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+        unsigned int VAO, VBO;
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(1, &VBO);
+        glBindVertexArray(VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(rectangle_gl), rectangle_gl, GL_STATIC_DRAW);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_TRIANGLES, 0, sizeof(rectangle_gl)/sizeof(float));
+        glDeleteVertexArrays(1, &VAO);
+        glDeleteBuffers(1, &VBO);
+    }
 
-	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-	ImGui::End();
+}
+// TODO:
+void HostGui::RenderPointCloud(){
 
-	if(show_demo_window){
-		ImGui::ShowDemoWindow(&show_demo_window);
-	}
+}
+void HostGui::RenderPathToGo(){
+
+}
+void HostGui::RenderPathBeen(){
+
+}
+void HostGui::RenderImageWindow(){
+
+}
+
+void HostGui::AddPlane(float x1, float y1, float z1, float x2, float y2, float z2){
+	std::lock_guard<std::mutex> guard{mtx_};
+	planes_.push_back(x1/map_range_);
+	planes_.push_back(y1/map_range_);
+	planes_.push_back(z1/map_range_);
+	planes_.push_back(x2/map_range_);
+	planes_.push_back(y2/map_range_);
+	planes_.push_back(z2/map_range_);
+}
+void HostGui::FlushPlanes(){
+	std::lock_guard<std::mutex> guard{mtx_};
+	planes_.clear();
+}
+// TODO:
+void HostGui::AddPointToGo(float x, float y, float z){
+
+}
+void HostGui::FlushPointToGo(){
+
+}
+void HostGui::AddPointBeen(float x, float y, float z){
+
+}
+void HostGui::FlushPointBeen(){
+
+}
+void AddPlotVal(int no, float value){
+
 }
 
 void HostGui::framebuffer_size_callback(GLFWwindow* window, int width, int height){
-	glViewport(0, 0, 0.6*width, 0.6*height);
+	glViewport(0, 0, width, height);
 }
 void HostGui::processInput(GLFWwindow *window){
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
