@@ -14,6 +14,9 @@ HostGui::~HostGui(){
     }
 }
 
+unsigned int HostGui::win_width_ = 1280;
+unsigned int HostGui::win_height_ = 720;
+
 void HostGui::ThreadMain(){
     glfwSetErrorCallback(glfw_error_callback);
 	if (!glfwInit()){
@@ -26,7 +29,7 @@ void HostGui::ThreadMain(){
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH_, SCR_HEIGHT_, "Host", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(win_width_, win_height_, "Host", NULL, NULL);
 	if (window == NULL) {
 		glfwTerminate();
 		std::cout << "Failed to create glfw window\n";
@@ -106,14 +109,16 @@ void HostGui::ThreadMain(){
         glm::mat4 view;//          = glm::mat4(1.0f);
         glm::mat4 projection    = glm::mat4(1.0f);
         model = glm::rotate(model, /*(float)glfwGetTime()*/30.f, glm::vec3(0.f, 1.0f, 0.0f));
-		// float radius = 5.f;
-		// float camX = sin(glfwGetTime()) * radius;
-		// float camZ = cos(glfwGetTime()) * radius;
-		view = glm::lookAt(glm::vec3(0, 4.0f, -3.f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        projection = glm::perspective(glm::radians(60.0f), (float)SCR_WIDTH_ / (float)SCR_HEIGHT_, 0.1f, 100.0f);
+		float cam_x = sin(glfwGetTime()) * map_range_;
+		float cam_z = cos(glfwGetTime()) * map_range_;
+		view = glm::lookAt(glm::vec3(cam_x, 2.f, cam_z), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        projection = glm::perspective(glm::radians(60.0f), (float)win_width_ / (float)win_height_, 0.1f, 100.0f);
 
 		/* Render OpenGL primitives here */
 		if(show_planes_){
+			glViewport(0, 0, win_width_/2, win_height_/2);
+			RenderPlanes(shader_planes, model, view, projection);
+			glViewport(0, win_height_/2, win_width_/2, win_height_/2);
 			RenderPlanes(shader_planes, model, view, projection);
 		}
 		if(show_point_cloud_){
@@ -130,7 +135,6 @@ void HostGui::ThreadMain(){
 		}
 
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-		// glViewport(0, 0, 500, 600);
 
 		// glfwMakeContextCurrent(window);
 		glfwSwapBuffers(window);
@@ -180,7 +184,7 @@ void HostGui::MainPanel(){
     pre_map_range = crt_map_range;
     if((ImGui::InputFloat("Map Range(m)", &crt_map_range, 1.0, 2.0, "%.0f"))){
 		std::lock_guard<std::mutex> guard{mtx_};
-		if(crt_map_range == 0.f){
+		if(crt_map_range <= 0.f){
 			crt_map_range = pre_map_range;
 		}
 		map_range_ = crt_map_range;
@@ -210,6 +214,7 @@ void HostGui::MainPanel(){
     }
     // NOTE: this is NOT the fps of the main application
     ImGui::Text("%.1f ms/frame (%.0f FPS)", 1000.0f/ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	ImGui::Text("window width: %d, height: %d", win_width_, win_height_);
     ImGui::End();
 }
 
@@ -304,12 +309,14 @@ void HostGui::AddPointBeen(float x, float y, float z){
 void HostGui::FlushPointBeen(){
 
 }
-void AddPlotVal(int no, float value){
+void HostGui::AddPlotVal(int no, float value){
 
 }
 
 void HostGui::framebuffer_size_callback(GLFWwindow* window, int width, int height){
-	glViewport(0, 0, width, height);
+	// glViewport(0, 0, width, height);
+	win_width_ = width;
+	win_height_ = height;
 }
 void HostGui::processInput(GLFWwindow *window){
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)

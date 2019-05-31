@@ -50,6 +50,15 @@
     *p1*-----p4
 */
 
+/*
+    OpenGL window coordinate:
+    0,H ------------ W,H
+     |                |
+     |                |
+     |                |
+    0,0 ------------ W,0
+*/
+
 class HostGui{
 public:
     HostGui();
@@ -75,8 +84,8 @@ private:
     std::mutex mtx_;
     std::atomic<bool> is_on_ = true;
 
-    const unsigned int SCR_WIDTH_ = 1280;
-    const unsigned int SCR_HEIGHT_ = 720;
+    static unsigned int win_width_;
+    static unsigned int win_height_;
 
     float map_range_ = 10;
 
