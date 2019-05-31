@@ -1,4 +1,6 @@
 #define STB_IMAGE_IMPLEMENTATION
+// dont include this file anywhere else.
+// dont include it in a header file;
 #include <stb/stb_image.h>
 #include "hostgui.h"
 
@@ -14,6 +16,7 @@ HostGui::~HostGui(){
 void HostGui::ThreadMain(){
     glfwSetErrorCallback(glfw_error_callback);
 	if (!glfwInit()){
+		std::cout << "Failed to init glfw\n";
         return;
     }
 
@@ -22,9 +25,10 @@ void HostGui::ThreadMain(){
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH_, SCR_HEIGHT_, "Imgui Test", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH_, SCR_HEIGHT_, "Host", NULL, NULL);
 	if (window == NULL) {
 		glfwTerminate();
+		std::cout << "Failed to create glfw window\n";
 		return;
 	}
 	glfwMakeContextCurrent(window);
@@ -33,11 +37,9 @@ void HostGui::ThreadMain(){
 
 	bool err = gl3wInit() != 0;
 	if (err){
-		fprintf(stderr, "Failed to initialize OpenGL loader!\n");
+		std::cout << "Failed to initialize OpenGL loader!\n";
 		return;
 	}
-
-	//==========================================================================
 
 	glEnable(GL_DEPTH_TEST);
 
@@ -46,40 +48,27 @@ void HostGui::ThreadMain(){
 
 	// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-	// load and create a texture
-    // -------------------------
+	// TODO: class Texture
     unsigned int texture1;
-    // texture 1
-    // ---------
     glGenTextures(1, &texture1);
     glBindTexture(GL_TEXTURE_2D, texture1);
-    // set the texture wrapping parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // set texture filtering parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // load image, create texture and generate mipmaps
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
     unsigned char *data = stbi_load("./resources/container.jpg", &width, &height, &nrChannels, 0);
-    if (data)
-    {
+    if (data){
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
-    }
-    else
-    {
+    }else{
         std::cout << "Failed to load texture" << std::endl;
     }
     stbi_image_free(data);
 
-	// tell opengl for each sampler to which texture unit it belongs to (only has to be done once)
-    // -------------------------------------------------------------------------------------------
     shader.use();
     shader.setInt("texture1", 0);
-
-	// ============================================================
 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -92,40 +81,28 @@ void HostGui::ThreadMain(){
 
 	io.Fonts->AddFontFromFileTTF("./resources/DroidSans.ttf", 20.0f);
 
-	constexpr unsigned int size = 50;
-	float omega = 3.141592654f*2.f/static_cast<float>(size);
-	std::vector<float> path;
-	float r = 2.f;
-	for(auto i=0; i<size; i++){
-		path.push_back(cos(static_cast<float>(i)*omega) * r);
-		path.push_back(0.f);
-		path.push_back(sin(static_cast<float>(i)*omega) * r);
-	}
+	bool show_demo_window = false;
 
 	while (!glfwWindowShouldClose(window) && is_on_){
-		// input
 		processInput(window);
 
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 
-		GuiWindow();
+		/* Render ImGui here */
+		MainPanel();
 
-		// Rendering
 		ImGui::Render();
 		// glfwMakeContextCurrent(window);
 		glClearColor(0.9f, 0.9f, 0.9f, 1.f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		// bind textures on corresponding texture units
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture1);
 
-		shader.use();
-
-		// create transformations
-        glm::mat4 model         = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+		// TODO: package this section about transformation
+        glm::mat4 model         = glm::mat4(1.0f);
         glm::mat4 view;//          = glm::mat4(1.0f);
         glm::mat4 projection    = glm::mat4(1.0f);
         model = glm::rotate(model, /*(float)glfwGetTime()*/30.f, glm::vec3(0.f, 1.0f, 0.0f));
@@ -134,55 +111,11 @@ void HostGui::ThreadMain(){
 		// float camZ = cos(glfwGetTime()) * radius;
 		view = glm::lookAt(glm::vec3(0, 4.0f, -3.f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         projection = glm::perspective(glm::radians(60.0f), (float)SCR_WIDTH_ / (float)SCR_HEIGHT_, 0.1f, 100.0f);
-        // retrieve the matrix uniform locations
-        unsigned int modelLoc = glGetUniformLocation(shader.ID, "model");
-        unsigned int viewLoc  = glGetUniformLocation(shader.ID, "view");
-        // pass them to the shaders (3 different ways)
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
-        // note: currently we set the projection matrix each frame, but since the projection matrix rarely changes it's often best practice to set it outside the main loop only once.
-        shader.setMat4("projection", projection);
 
-		float v0[] = {
-			-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-			0.5f, -0.5f, -0.5f,  2.0f, 0.0f,
-			0.5f,  0.5f, -0.5f,  2.0f, 2.0f,
-			0.5f,  0.5f, -0.5f,  2.0f, 2.0f,
-			-0.5f,  0.5f, -0.5f,  0.0f, 2.0f,
-			-0.5f, -0.5f, -0.5f,  0.0f, 0.0f
-		};
-		float v1[] = {
-			-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-			0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-			0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-			0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-			-0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-			-0.5f, -0.5f,  0.5f,  0.0f, 0.0f
-		};
-		std::vector<float*> v;
-		v.push_back(v0);
-		v.push_back(v1);
-
-		for(auto i=0; i<v.size(); i++){
-			unsigned int VAO, VBO;
-			glGenVertexArrays(1, &VAO);
-			glGenBuffers(1, &VBO);
-			glBindVertexArray(VAO);
-			glBindBuffer(GL_ARRAY_BUFFER, VBO);
-			glBufferData(GL_ARRAY_BUFFER, sizeof(v0), v[i], GL_STATIC_DRAW);
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-			glEnableVertexAttribArray(0);
-			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-    		glEnableVertexAttribArray(1);
-			glBindVertexArray(VAO);
-        	glDrawArrays(GL_TRIANGLES, 0, sizeof(v0)/sizeof(float));
-			glDeleteVertexArrays(1, &VAO);
-			glDeleteBuffers(1, &VBO);
-		}
-
-		RenderPoints(path, shader_strip_line, model, view, projection);
+		/* Render OpenGL primitives here */
 
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		glViewport(0, 0, 500, 600);
 
 		// glfwMakeContextCurrent(window);
 		glfwSwapBuffers(window);
@@ -229,7 +162,7 @@ void HostGui::RenderPoints(std::vector<float> data, Shader &shader, glm::mat4 &m
 	glDeleteBuffers(1, &vbo_stripline);
 }
 
-void HostGui::GuiWindow(){
+void HostGui::MainPanel(){
 	ImGui::Begin("Hello, world!");
 
 	static bool show_demo_window = false;
@@ -247,7 +180,7 @@ void HostGui::GuiWindow(){
 }
 
 void HostGui::framebuffer_size_callback(GLFWwindow* window, int width, int height){
-	glViewport(0, 0, width, height);
+	glViewport(0, 0, 0.6*width, 0.6*height);
 }
 void HostGui::processInput(GLFWwindow *window){
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
