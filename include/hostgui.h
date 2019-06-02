@@ -14,7 +14,31 @@
 #include <vector>
 #include <atomic>
 #include <mutex>
+#include <queue>
+#include <string>
 #include "shader.h"
+
+class Component{
+public:
+    Component(){
+        messages_.push("msg test");
+    }
+private:
+    std::mutex mtx_;
+    std::queue<std::string> messages_;
+    friend class Transceiver;
+    std::string Read(){
+        std::lock_guard<std::mutex> lg{mtx_};
+        auto msg = messages_.front();
+        messages_.pop();
+        return msg;
+    }
+    void Write(std::string msg){
+        std::lock_guard<std::mutex> lg{mtx_};
+        messages_.push(msg);
+        std::cout << messages_.front() << "\n";
+    }
+};
 
 //TODO: 3d plane render
 //TODO: mouse click response
@@ -59,7 +83,7 @@
     0,0 ------------ W,0
 */
 
-class HostGui{
+class HostGui : public Component{
 public:
     HostGui();
     HostGui(const HostGui&) = default;
