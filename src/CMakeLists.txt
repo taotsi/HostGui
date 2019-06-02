@@ -13,6 +13,7 @@ link_directories(${PROJECT_SOURCE_DIR}/deps/glfw321/lib-vc2015)
 add_executable(HostGui
     main.cc
     hostgui.cc
+    transceiver.cc
     imgui_impl_glfw.cpp
     imgui_impl_opengl3.cpp
     ${PROJECT_SOURCE_DIR}/deps/imgui/imgui_demo.cpp

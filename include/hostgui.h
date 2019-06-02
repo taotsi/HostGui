@@ -65,6 +65,9 @@ public:
     void FlushPointToGo();
     void AddPlotExam(int no, float value);
 
+    void TurnOff();
+    void TurnOn();
+
 private:
     std::thread thread_;
     void ThreadMain();
@@ -88,6 +91,7 @@ private:
     void MainPanel();
 
     void RenderPoints(std::vector<float> data, Shader &shader, glm::mat4 &model, glm::mat4 &view, glm::mat4 &projection);
+    void RenderTest(std::vector<float> data, Shader &shader, glm::mat4 &model, glm::mat4 &view, glm::mat4 &projection);
 };
 
 #endif // HOSTGUI_H_

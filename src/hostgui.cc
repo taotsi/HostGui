@@ -13,6 +13,14 @@ HostGui::~HostGui(){
     }
 }
 
+void HostGui::TurnOff(){
+	is_on_ = false;
+}
+
+void HostGui::TurnOn(){
+	is_on_ = true;
+}
+
 void HostGui::ThreadMain(){
     glfwSetErrorCallback(glfw_error_callback);
 	if (!glfwInit()){
@@ -43,8 +51,11 @@ void HostGui::ThreadMain(){
 
 	glEnable(GL_DEPTH_TEST);
 
+	/* Shaders here */
 	Shader shader{"./src/vertex_shader.vs", "./src/fragment_shader.fs"};
 	Shader shader_strip_line{"./src/line_strip.vs", "./src/line_strip.fs"};
+	Shader shader_test{"./src/test_shader.vs", "./src/test_shader.fs"};
+
 
 	// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
@@ -113,6 +124,7 @@ void HostGui::ThreadMain(){
         projection = glm::perspective(glm::radians(60.0f), (float)SCR_WIDTH_ / (float)SCR_HEIGHT_, 0.1f, 100.0f);
 
 		/* Render OpenGL primitives here */
+		RenderTest(std::vector<float>{}, shader_test, model, view, projection);
 
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		glViewport(0, 0, 500, 600);
@@ -136,6 +148,25 @@ void HostGui::ThreadMain(){
 	glfwTerminate();
 
     is_on_ = false;
+}
+
+
+
+void HostGui::MainPanel(){
+	ImGui::Begin("Hello, world!");
+
+	static bool show_demo_window = false;
+	ImGui::Checkbox("Demo Window", &show_demo_window);
+
+	static float f = 0.0f;
+	ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	ImGui::End();
+
+	if(show_demo_window){
+		ImGui::ShowDemoWindow(&show_demo_window);
+	}
 }
 
 void HostGui::RenderPoints(std::vector<float> data, Shader &shader, glm::mat4 &model, glm::mat4 &view, glm::mat4 &projection){
@@ -162,21 +193,36 @@ void HostGui::RenderPoints(std::vector<float> data, Shader &shader, glm::mat4 &m
 	glDeleteBuffers(1, &vbo_stripline);
 }
 
-void HostGui::MainPanel(){
-	ImGui::Begin("Hello, world!");
+void HostGui::RenderTest(std::vector<float> data, Shader &shader, glm::mat4 &model, glm::mat4 &view, glm::mat4 &projection){
+	shader.use();
+	shader.setMat4("model", model);
+	shader.setMat4("view", view);
+	shader.setMat4("projection", projection);
 
-	static bool show_demo_window = false;
-	ImGui::Checkbox("Demo Window", &show_demo_window);
+	float vertices[] = {
+        -0.5f, -0.5f, 0.0f, // left
+         0.5f, -0.5f, 0.0f, // right
+         0.0f,  0.5f, 0.0f  // top
+    };
 
-	static float f = 0.0f;
-	ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+    unsigned int VBO, VAO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
+    glBindVertexArray(VAO);
 
-	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-	ImGui::End();
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-	if(show_demo_window){
-		ImGui::ShowDemoWindow(&show_demo_window);
-	}
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    // You can unbind the VAO afterwards so other VAO calls won't accidentally modify this VAO, but this rarely happens. Modifying other
+    // VAOs requires a call to glBindVertexArray anyways so we generally don't unbind VAOs (nor VBOs) when it's not directly necessary.
+    glBindVertexArray(0);
 }
 
 void HostGui::framebuffer_size_callback(GLFWwindow* window, int width, int height){
