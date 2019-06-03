@@ -8,8 +8,7 @@ int main(int, char**){
 	// std::shared_ptr<HostGui> host_ptr;
 	auto cpn_ptr = std::make_shared<Component>();
 	Transceiver tc;
-	tc.AddSubscriber("msgtest", cpn_ptr);
-	tc.Loop();
+	tc.AddSubscriber({MsgType::kOut, "msgtest"}, cpn_ptr);
 	while(tc.is_on());
 
 	std::cout << "~done~\n";

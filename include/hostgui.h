@@ -21,7 +21,7 @@
 class Component{
 public:
     Component(){
-        messages_.push("cpn_msg 2 4.2 5.6");
+        messages_.push("msgtest 2 4.2 5.6");
     }
     Component(const Component&) = default;
     Component(Component&&) = default;
@@ -34,7 +34,7 @@ private:
     friend class Transceiver;
 
     bool Read(std::string &msg){
-        // std::lock_guard<std::mutex> lg{mtx_msg_};
+        std::lock_guard<std::mutex> lg{mtx_msg_};
         if(messages_.empty()){
             std::cout << "no message from component\n";
             return false;
@@ -44,9 +44,9 @@ private:
         return true;
     }
     void Write(std::string &msg){
-        // std::lock_guard<std::mutex> lg{mtx_msg_};
+        std::lock_guard<std::mutex> lg{mtx_msg_};
         messages_.push(msg);
-        std::cout << "component get msg: "<< messages_.front() << "\n";
+        std::cout << "component get msg: "<< msg << "\n";
     }
 };
 
