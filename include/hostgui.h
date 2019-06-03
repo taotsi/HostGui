@@ -21,22 +21,32 @@
 class Component{
 public:
     Component(){
-        messages_.push("msg test");
+        messages_.push("cpn_msg 2 4.2 5.6");
     }
+    Component(const Component&) = default;
+    Component(Component&&) = default;
+    Component& operator=(const Component&) = default;
+    Component& operator=(Component&&) = default;
+    ~Component() = default;
 private:
-    std::mutex mtx_;
+    std::mutex mtx_msg_;
     std::queue<std::string> messages_;
     friend class Transceiver;
-    std::string Read(){
-        std::lock_guard<std::mutex> lg{mtx_};
-        auto msg = messages_.front();
+
+    bool Read(std::string &msg){
+        // std::lock_guard<std::mutex> lg{mtx_msg_};
+        if(messages_.empty()){
+            std::cout << "no message from component\n";
+            return false;
+        }
+        msg = messages_.front();
         messages_.pop();
-        return msg;
+        return true;
     }
-    void Write(std::string msg){
-        std::lock_guard<std::mutex> lg{mtx_};
+    void Write(std::string &msg){
+        // std::lock_guard<std::mutex> lg{mtx_msg_};
         messages_.push(msg);
-        std::cout << messages_.front() << "\n";
+        std::cout << "component get msg: "<< messages_.front() << "\n";
     }
 };
 

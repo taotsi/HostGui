@@ -23,6 +23,8 @@ add_executable(HostGui
     ${PROJECT_SOURCE_DIR}/deps/gl3w/GL/gl3w.c
 )
 
+set_property(TARGET HostGui PROPERTY CXX_STANDARD 17)
+
 target_link_libraries(HostGui glfw3.lib)
 target_link_libraries(HostGui opengl32.lib)
 

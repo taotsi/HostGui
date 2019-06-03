@@ -26,8 +26,10 @@ public:
 
     void TurnOn();
     void TurnOff();
+    void Loop();
     bool is_on();
     void AddSubscriber(std::string msg_type, std::shared_ptr<Component> cpn);
+    void AddPublisher(std::string msg_type, std::shared_ptr<Component> cpn);
 
 private:
     std::thread thread_;

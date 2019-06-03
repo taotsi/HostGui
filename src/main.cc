@@ -6,11 +6,10 @@
 int main(int, char**){
 	// HostGui host;
 	// std::shared_ptr<HostGui> host_ptr;
-	Component cpn;
-	std::shared_ptr<Component> cpn_ptr;
+	auto cpn_ptr = std::make_shared<Component>();
 	Transceiver tc;
 	tc.AddSubscriber("msgtest", cpn_ptr);
-	// while(host.is_on());
+	tc.Loop();
 	while(tc.is_on());
 
 	std::cout << "~done~\n";
