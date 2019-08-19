@@ -113,17 +113,18 @@ void Transceiver::ThreadMain(){
                 }
             }
         }
-        for(auto& [mc_pub, pubs] : publishers_){
-            if(mc_pub.type() == MsgType::kOut){
-                for(auto &it : pubs){
+        // for(auto& [mc_pub, pubs] : publishers_){
+        for(auto& p : publishers_){
+            if(p.first.type() == MsgType::kOut){
+                for(auto &it : p.second){
                     if(it->Read(raw_msg) && CheckFormat(raw_msg, msg_channel, n, msg_content)){
                         TransmitToOut(msg_content);
                     }
                 }
-            }else if(mc_pub.type() == MsgType::kUniv){
-                MsgChannel mc_sub{MsgType::kUniv, mc_pub.channel()};
+            }else if(p.first.type() == MsgType::kUniv){
+                MsgChannel mc_sub{MsgType::kUniv, p.first.channel()};
                 if(subscribers_.find(mc_sub) != subscribers_.end()){
-                    for(auto &it : pubs){
+                    for(auto &it : p.second){
                         if(it->Read(raw_msg) && CheckFormat(raw_msg, msg_channel, n, msg_content)){
                             for(auto &it : subscribers_[mc_sub]){
                                 it->Write(msg_content);

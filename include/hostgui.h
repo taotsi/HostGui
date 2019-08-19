@@ -119,7 +119,7 @@ private:
     std::thread thread_;
     void ThreadMain();
     std::mutex mtx_;
-    std::atomic<bool> is_on_ = true;
+    std::atomic<bool> is_on_{true};
 
     static unsigned int win_width_;
     static unsigned int win_height_;
