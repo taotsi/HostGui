@@ -23,7 +23,8 @@ add_executable(HostGui
     ${PROJECT_SOURCE_DIR}/deps/gl3w/GL/gl3w.c
 )
 
-# set_property(TARGET HostGui PROPERTY CXX_STANDARD 14)
+# set_property(TARGET HostGui PROPERTY CXX_STANDARD 17)
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pthread")
 
 # target_link_libraries(HostGui glfw3.lib)
 # target_link_libraries(HostGui opengl32.lib)
@@ -32,11 +33,11 @@ find_package(glfw3 3.2 REQUIRED)
 target_link_libraries(HostGui glfw)
 find_package(OpenGL REQUIRED)
 target_include_directories(HostGui PUBLIC ${OPENGL_INCLUDE_DIR})
-target_link_libraries(HostGui ${OPENGL_gl_LIBRARY})
+target_link_libraries(HostGui ${OPENGL_gl_LIBRARY} ${CMAKE_DL_LIBS})
 
-if(MSVC)
-    set_target_properties(HostGui PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
-    set_target_properties(HostGui PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG ${PROJECT_BINARY_DIR}/bin)
-    set_target_properties(HostGui PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE ${PROJECT_BINARY_DIR}/bin)
-    # etc for the other available configuration types (MinSizeRel, RelWithDebInfo)
-endif(MSVC)
+
+# if(MSVC)
+#     set_target_properties(HostGui PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
+#     set_target_properties(HostGui PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG ${PROJECT_BINARY_DIR}/bin)
+#     set_target_properties(HostGui PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE ${PROJECT_BINARY_DIR}/bin)
+# endif(MSVC)
